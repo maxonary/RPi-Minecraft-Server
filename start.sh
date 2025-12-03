@@ -5,7 +5,7 @@
 # Minecraft Server startup script using screen -- view the console with screen -r minecraft
 
 # Set path variable
-USERPATH="pathvariable"
+USERPATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/games:/usr/games"
 PathLength=${#USERPATH}
 if [[ "$PathLength" -gt 12 ]]; then
     PATH="$USERPATH"
@@ -53,10 +53,10 @@ while [ -z "$DefaultRoute" ]; do
 done
 
 # Switch to server directory
-cd dirname/minecraft/
+cd /home/pi/minecraft/
 
 # Take ownership of server files and set correct permissions
-Permissions=$(bash dirname/minecraft/fixpermissions.sh -a)
+Permissions=$(bash /home/pi/minecraft/fixpermissions.sh -a)
 
 # Back up server
 if [ -d "world" ]; then
@@ -70,9 +70,9 @@ if [ -d "world" ]; then
 fi
 
 # Rotate backups -- keep most recent 10
-if [ -e "dirname/minecraft/backups" ]; then
+if [ -e "/home/pi/minecraft/backups" ]; then
     Rotate=$(
-        pushd dirname/minecraft/backups
+        pushd /home/pi/minecraft/backups
         ls -1tr | head -n -10 | xargs -d '\n' rm -f --
         popd
     )
@@ -192,12 +192,12 @@ if [ "$?" != 0 ]; then
     echo "Unable to connect to update website (internet connection may be down).  Skipping update ..."
 else
     # Get latest build
-    BuildJSON=$(curl --no-progress-meter -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4.212 Safari/537.36" https://api.papermc.io/v2/projects/paper/versions/$Version)
-    Build=$(echo "$BuildJSON" | rev | cut -d, -f 1 | cut -d']' -f 2 | cut -d'[' -f 1 | rev)
+    BuildJSON=$(curl -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4.212 Safari/537.36" https://papermc.io/api/v2/projects/paper/versions/1.20.4)
+    Build=$(echo "$BuildJSON" | rev | cut -d, -f 1 | cut -d']' -f 2 | cut -d'[' -f 2 | rev)
     Build=$(($Build + 0))
     if [[ $Build != 0 ]]; then
         echo "Latest paperclip build found: $Build"
-        curl -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4.212 Safari/537.36" -o paperclip.jar "https://api.papermc.io/v2/projects/paper/versions/verselect/builds/$Build/downloads/paper-verselect-$Build.jar"
+        curl -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4.212 Safari/537.36" -o paperclip.jar "https://papermc.io/api/v2/projects/paper/versions/1.20.4/builds/$Build/downloads/paper-1.20.4-$Build.jar"
     else
         echo "Unable to retrieve latest Paper build (got result of $Build)"
     fi
@@ -205,4 +205,8 @@ fi
 
 echo "Starting Minecraft server.  To view window type screen -r minecraft."
 echo "To minimize the window and let the server run in the background, press Ctrl+A then Ctrl+D"
-screen -dmS minecraft dirname/minecraft/jre/bin/java -DPaper.IgnoreJavaVersion=true -jar -Xms400M -XmxmemselectM dirname/minecraft/paperclip.jar
+#screen -dmS minecraft /home/pi/minecraft/jre/bin/java -DPaper.IgnoreJavaVersion=true -jar -Xms400M -Xmx6700M /home/pi/minecraft/paperclip.jar
+screen -dmS minecraft npm run start
+screen -dmS minecraftGit bash -c 'cd ../convitelist; git pull'
+screen -dmS minecraftApi bash -c 'cd ../convitelist/backend; npm install;  npm run build; npm run start'
+screen -dmS minecraftWeb bash -c 'cd ../convitelist/frontend; npm install; npm run build; sudo scp -r ./build/* /var/www/server.r-nold.eu/; sudo systemctl restart nginx'

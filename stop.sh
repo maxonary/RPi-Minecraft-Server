@@ -5,7 +5,7 @@
 # Minecraft Server stop script - primarily called by minecraft service but can be ran manually with ./stop.sh
 
 # Set path variable
-USERPATH="pathvariable"
+USERPATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/games:/usr/games"
 PathLength=${#USERPATH}
 if [[ "$PathLength" -gt 12 ]]; then
     PATH="$USERPATH"
