@@ -83,8 +83,6 @@ paper*
 ViPiLand*/*
 AFreshStart*/*
 backups*/*
-start.sh
-start_screen.sh
 
 # Java
 java*
