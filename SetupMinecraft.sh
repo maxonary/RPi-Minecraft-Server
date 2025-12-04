@@ -1,15 +1,36 @@
 #!/bin/bash
 # Minecraft Server Installation Script - James A. Chambers - https://jamesachambers.com
 # More information at https://jamesachambers.com/raspberry-pi-minecraft-server-script-with-startup-service/
-# GitHub Repository: https://github.com/TheRemote/RaspberryPiMinecraft
+# GitHub Repository: https://github.com/maxonary/RPi-Minecraft-Server
 
 # To run the setup script use:
-# curl https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/SetupMinecraft.sh | bash
+# curl https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/SetupMinecraft.sh | bash
 
-# Minecraft server version
-Version="1.21.8"
+# Minecraft server version - can be overridden with MINECRAFT_VERSION environment variable
+Version="${MINECRAFT_VERSION:-1.21.10}"
 # Set to AllowLocalCopy="1" if you make changes to the script otherwise any changes will be discarded and the latest online version will run
 AllowLocalCopy="0"
+
+# Non-interactive mode: Uses environment variables instead of prompting
+# You can set these via environment variables OR by creating a .env file in the same directory
+# Set NON_INTERACTIVE=0 to enable interactive prompts
+# Environment variables that can be set (in .env file or as environment variables):
+#   MINECRAFT_VERSION - Minecraft version (e.g., "1.21.3") - defaults to 1.21.3
+#   MINECRAFT_MEMORY - Memory in MB (e.g., 2048) - required in non-interactive mode
+#   MINECRAFT_SERVER_NAME - Server name
+#   MINECRAFT_AUTO_START - "y" or "n" for auto-start at boot (default: "n")
+#   MINECRAFT_DAILY_REBOOT - "y" or "n" for daily reboot at 4am (default: "n")
+#   MINECRAFT_AUTO_UPDATE_VERSION - "y" or "n" for auto-update to latest Minecraft version (default: "n")
+#   MINECRAFT_SKIP_LOW_MEMORY_WARNING - "1" to skip low memory warning
+# If any of the above environment variables are set, non-interactive mode is automatically enabled
+# Example .env file:
+#   MINECRAFT_VERSION=1.21.3
+#   MINECRAFT_MEMORY=2048
+#   MINECRAFT_SERVER_NAME=MyServer
+#   MINECRAFT_AUTO_START=y
+#   MINECRAFT_DAILY_REBOOT=n
+#   MINECRAFT_AUTO_UPDATE_VERSION=n
+NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
 # Custom Directory
 # You can change this to a custom directory -- it is meant to be the root directory that contains everything (not including the "minecraft" folder part)
@@ -96,8 +117,10 @@ Get_ServerMemory() {
     Print_Style "WARNING:  Available memory to run the server is less than 700MB.  This will impact performance and stability." "$RED"
     Print_Style "You can increase available memory by closing other processes.  If nothing else is running your distro may be using all available memory." "$RED"
     Print_Style "It is recommended to use a headless distro (Lite or Server version) to ensure you have the maximum memory available possible." "$RED"
-    echo -n "Press any key to continue"
-    read endkey </dev/tty
+    if [ "$NON_INTERACTIVE" != "1" ] && [ "${MINECRAFT_SKIP_LOW_MEMORY_WARNING}" != "1" ]; then
+      echo -n "Press any key to continue"
+      read endkey </dev/tty
+    fi
   fi
 
   # Ask user for amount of memory they want to dedicate to the Minecraft server
@@ -109,9 +132,22 @@ Get_ServerMemory() {
   fi
   MemSelected=0
   RecommendedMemory=$(($AvailableMemory - 400))
+  
+  # Check for non-interactive mode
+  if [ "$NON_INTERACTIVE" = "1" ] && [ -n "${MINECRAFT_MEMORY}" ]; then
+    MemSelected="${MINECRAFT_MEMORY}"
+    Print_Style "Using memory from environment variable: $MemSelected MB" "$GREEN"
+  fi
+  
   while [[ $MemSelected -lt 600 || $MemSelected -ge $TotalMemory ]]; do
-    echo -n "Enter amount of memory in megabytes to dedicate to the Minecraft server (recommended: $RecommendedMemory): "
-    read MemSelected </dev/tty
+    if [ "$NON_INTERACTIVE" != "1" ]; then
+      echo -n "Enter amount of memory in megabytes to dedicate to the Minecraft server (recommended: $RecommendedMemory): "
+      read MemSelected </dev/tty
+    else
+      Print_Style "Error: MINECRAFT_MEMORY environment variable not set or invalid for non-interactive mode" "$RED"
+      Print_Style "Please set MINECRAFT_MEMORY to a value between 600 and $TotalMemory" "$YELLOW"
+      exit 1
+    fi
     if [[ $MemSelected -lt 600 ]]; then
       Print_Style "Please enter a minimum of 600" "$RED"
     elif [[ $MemSelected -gt $TotalMemory ]]; then
@@ -134,7 +170,7 @@ Update_Scripts() {
 
   # Download start.sh from repository
   Print_Style "Grabbing start.sh from repository..." "$YELLOW"
-  curl -H "Accept-Encoding: identity" -L -o start.sh https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/start.sh
+  curl -H "Accept-Encoding: identity" -L -o start.sh https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/start.sh
   chmod +x start.sh
   sed -i "s:dirname:$DirName:g" start.sh
   sed -i "s:memselect:$MemSelected:g" start.sh
@@ -143,21 +179,21 @@ Update_Scripts() {
 
   # Download stop.sh from repository
   echo "Grabbing stop.sh from repository..."
-  curl -H "Accept-Encoding: identity" -L -o stop.sh https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/stop.sh
+  curl -H "Accept-Encoding: identity" -L -o stop.sh https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/stop.sh
   chmod +x stop.sh
   sed -i "s:dirname:$DirName:g" stop.sh
   sed -i "s<pathvariable<$PATH<g" stop.sh
 
   # Download restart.sh from repository
   echo "Grabbing restart.sh from repository..."
-  curl -H "Accept-Encoding: identity" -L -o restart.sh https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/restart.sh
+  curl -H "Accept-Encoding: identity" -L -o restart.sh https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/restart.sh
   chmod +x restart.sh
   sed -i "s:dirname:$DirName:g" restart.sh
   sed -i "s<pathvariable<$PATH<g" restart.sh
 
   # Download permissions.sh from repository
   echo "Grabbing fixpermissions.sh from repository..."
-  curl -H "Accept-Encoding: identity" -L -o fixpermissions.sh https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/fixpermissions.sh
+  curl -H "Accept-Encoding: identity" -L -o fixpermissions.sh https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/fixpermissions.sh
   chmod +x fixpermissions.sh
   sed -i "s:dirname:$DirName:g" fixpermissions.sh
   sed -i "s:userxname:$UserName:g" fixpermissions.sh
@@ -165,20 +201,25 @@ Update_Scripts() {
 
   # Download update.sh from repository
   echo "Grabbing update.sh from repository..."
-  curl -H "Accept-Encoding: identity" -L -o update.sh https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/update.sh
+  curl -H "Accept-Encoding: identity" -L -o update.sh https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/update.sh
   chmod +x update.sh
   sed -i "s<pathvariable<$PATH<g" update.sh
 }
 
 # Updates Minecraft service
 Update_Service() {
-  sudo curl -H "Accept-Encoding: identity" -L -o /etc/systemd/system/minecraft.service https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/minecraft.service
+  sudo curl -H "Accept-Encoding: identity" -L -o /etc/systemd/system/minecraft.service https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/minecraft.service
   sudo sed -i "s:userxname:$UserName:g" /etc/systemd/system/minecraft.service
   sudo sed -i "s:dirname:$DirName:g" /etc/systemd/system/minecraft.service
   sudo systemctl daemon-reload
   Print_Style "Minecraft can automatically start at boot if you wish." "$CYAN"
-  echo -n "Start Minecraft server at startup automatically (y/n)?"
-  read answer </dev/tty
+  if [ "$NON_INTERACTIVE" = "1" ]; then
+    answer="${MINECRAFT_AUTO_START:-n}"
+    Print_Style "Using auto-start setting from environment: $answer" "$GREEN"
+  else
+    echo -n "Start Minecraft server at startup automatically (y/n)?"
+    read answer </dev/tty
+  fi
   if [ "$answer" != "${answer#[Yy]}" ]; then
     sudo systemctl enable minecraft.service
   fi
@@ -191,8 +232,13 @@ Configure_Reboot() {
   CurrentTime=$(date)
   Print_Style "Your time zone is currently set to $TimeZone.  Current system time: $CurrentTime" "$CYAN"
   Print_Style "You can adjust/remove the selected reboot time later by typing crontab -e" "$CYAN"
-  echo -n "Automatically reboot Pi and update server at 4am daily (y/n)?"
-  read answer </dev/tty
+  if [ "$NON_INTERACTIVE" = "1" ]; then
+    answer="${MINECRAFT_DAILY_REBOOT:-n}"
+    Print_Style "Using daily reboot setting from environment: $answer" "$GREEN"
+  else
+    echo -n "Automatically reboot Pi and update server at 4am daily (y/n)?"
+    read answer </dev/tty
+  fi
   if [ "$answer" != "${answer#[Yy]}" ]; then
     croncmd="$DirName/minecraft/restart.sh"
     cronjob="0 4 * * * $croncmd 2>&1"
@@ -269,9 +315,37 @@ Fix_Permissions() {
 
 #################################################################################################
 
+# Load environment variables from .env file if it exists (after functions are defined)
+# This must happen before auto-detecting non-interactive mode
+if [ -f ".env" ]; then
+  Print_Style "Loading environment variables from .env file..." "$CYAN"
+  # Source the .env file - set -a automatically exports all variables
+  set -a
+  source .env 2>/dev/null || . .env
+  set +a
+  # Re-evaluate Version in case MINECRAFT_VERSION was set in .env
+  Version="${MINECRAFT_VERSION:-1.21.3}"
+fi
+
+# Auto-detect non-interactive mode if environment variables are set (after functions are defined)
+if [ "$NON_INTERACTIVE" = "0" ]; then
+  if [ -n "${MINECRAFT_MEMORY}" ] || [ -n "${MINECRAFT_SERVER_NAME}" ] || [ -n "${MINECRAFT_AUTO_START}" ] || [ -n "${MINECRAFT_DAILY_REBOOT}" ] || [ -n "${MINECRAFT_AUTO_UPDATE_VERSION}" ] || [ -n "${MINECRAFT_VERSION}" ]; then
+    NON_INTERACTIVE=1
+    Print_Style "Non-interactive mode enabled (environment variables detected)" "$GREEN"
+  fi
+fi
+
 Print_Style "Minecraft Server installation script by James A. Chambers - https://jamesachambers.com/" "$MAGENTA"
-Print_Style "Version $Version will be installed.  To change this, open SetupMinecraft.sh and change the \"Version\" variable to the version you want to install." "$MAGENTA"
-Print_Style "Latest version is always available at https://github.com/TheRemote/RaspberryPiMinecraft" "$MAGENTA"
+Print_Style "Version $Version will be installed." "$MAGENTA"
+if [ "$NON_INTERACTIVE" = "1" ]; then
+  Print_Style "Running in non-interactive mode (using environment variables)" "$CYAN"
+  if [ -n "${MINECRAFT_VERSION}" ]; then
+    Print_Style "Minecraft version from MINECRAFT_VERSION: $Version" "$CYAN"
+  fi
+else
+  Print_Style "To change the version, set MINECRAFT_VERSION environment variable or edit the Version variable in the script." "$YELLOW"
+fi
+Print_Style "Latest version is always available at https://github.com/maxonary/RPi-Minecraft-Server" "$MAGENTA"
 Print_Style "Don't forget to set up port forwarding on your router!  The default port is 25565" "$MAGENTA"
 
 cd "$DirName"
@@ -279,7 +353,7 @@ cd "$DirName"
 if [[ -e "SetupMinecraft.sh" && "$AllowLocalCopy" -ne "1" ]]; then
   rm -f "SetupMinecraft.sh"
   echo "Local copy of SetupMinecraft.sh running.  Exiting and running online version.  To override set AllowLocalCopy=\"1\" at the top of the script."
-  curl https://raw.githubusercontent.com/TheRemote/RaspberryPiMinecraft/master/SetupMinecraft.sh | bash
+  curl https://raw.githubusercontent.com/maxonary/RPi-Minecraft-Server/master/SetupMinecraft.sh | bash
   exit 1
 fi
 
@@ -366,11 +440,110 @@ Install_Java
 Get_ServerMemory
 
 # Retrieve latest build of Paper minecraft server
+# Using the new PaperMC Downloads Service API v3
+# Documentation: https://docs.papermc.io/misc/downloads-service/
 Print_Style "Getting latest Paper Minecraft server..." "$YELLOW"
-BuildJSON=$(curl --no-progress-meter -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4.212 Safari/537.36" https://api.papermc.io/v2/projects/paper/versions/$Version)
-Build=$(echo "$BuildJSON" | rev | cut -d, -f 1 | cut -d']' -f 2 | cut -d'[' -f 1 | rev)
-Build=$(($Build + 0))
-curl -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4.212 Safari/537.36" -o paperclip.jar "https://api.papermc.io/v2/projects/paper/versions/$Version/builds/$Build/downloads/paper-$Version-$Build.jar"
+
+# Check if jq is available (required for the new API)
+if ! command -v jq &> /dev/null; then
+  Print_Style "Error: jq is required for the PaperMC API. Installing jq..." "$YELLOW"
+  if command -v apt-get &> /dev/null; then
+    sudo apt-get update && sudo apt-get install -y jq
+  else
+    Print_Style "Error: Cannot install jq automatically. Please install it manually:" "$RED"
+    Print_Style "  sudo apt-get install jq" "$YELLOW"
+    exit 1
+  fi
+fi
+
+# Set User-Agent as required by PaperMC API
+# Must identify the software and include contact information
+USER_AGENT="RPi-Minecraft-Server-Setup/1.0 (https://github.com/maxonary/RPi-Minecraft-Server)"
+
+# Get builds for the specified version
+BuildJSON=$(curl -s -H "User-Agent: $USER_AGENT" "https://fill.papermc.io/v3/projects/paper/versions/$Version/builds")
+
+# Check if the API returned an error
+if echo "$BuildJSON" | jq -e '.ok == false' > /dev/null 2>&1; then
+  ERROR_MSG=$(echo "$BuildJSON" | jq -r '.message // "Unknown error"')
+  Print_Style "Error from PaperMC API: $ERROR_MSG" "$RED"
+  Print_Style "Version $Version may not be available. Please check https://papermc.io/downloads" "$YELLOW"
+  exit 1
+fi
+
+# Get the download URL for the latest stable build
+# According to PaperMC docs: https://docs.papermc.io/misc/downloads-service/#downloading-the-latest-stable-build
+PAPERMC_URL=$(echo "$BuildJSON" | jq -r 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url) // "null"')
+
+if [ "$PAPERMC_URL" = "null" ] || [ -z "$PAPERMC_URL" ]; then
+  Print_Style "Error: No stable build found for version $Version" "$RED"
+  Print_Style "Available builds may be experimental only. Check https://papermc.io/downloads" "$YELLOW"
+  
+  # Try to get latest build (even if experimental) as fallback
+  PAPERMC_URL=$(echo "$BuildJSON" | jq -r 'first(.[] | .downloads."server:default".url) // "null"')
+  
+  if [ "$PAPERMC_URL" != "null" ] && [ -n "$PAPERMC_URL" ]; then
+    Print_Style "Warning: Using experimental build (not recommended for production)" "$YELLOW"
+  else
+    Print_Style "Error: No builds available for version $Version" "$RED"
+    exit 1
+  fi
+fi
+
+# Get build number for display
+BUILD_NUMBER=$(echo "$BuildJSON" | jq -r 'first(.[] | select(.channel == "STABLE") | .id) // first(.[] | .id) // "unknown"')
+Print_Style "Downloading Paper build $BUILD_NUMBER for Minecraft $Version..." "$GREEN"
+
+# Download the Paper server JAR
+curl -H "User-Agent: $USER_AGENT" -H "Accept-Encoding: identity" -L -o paperclip.jar "$PAPERMC_URL"
+
+# Verify download was successful
+if [ ! -f "paperclip.jar" ] || [ ! -s "paperclip.jar" ]; then
+  Print_Style "Error: Failed to download Paper server JAR file from: $PAPERMC_URL" "$RED"
+  Print_Style "Please check your internet connection and try again" "$YELLOW"
+  exit 1
+fi
+
+Print_Style "Successfully downloaded Paper server JAR (build $BUILD_NUMBER)" "$GREEN"
+
+# Save Minecraft version to file for start.sh to use later
+echo "$Version" > $DirName/minecraft/.minecraft_version
+Print_Style "Saved Minecraft version $Version to .minecraft_version" "$GREEN"
+
+# Ask about auto-updating to latest Minecraft version
+Print_Style "" "$MAGENTA"
+Print_Style "Auto-update to latest Minecraft version?" "$MAGENTA"
+Print_Style "If enabled, the server will automatically upgrade to newer Minecraft versions (e.g., 1.21.3 -> 1.21.4 -> 1.22.0)" "$YELLOW"
+Print_Style "If disabled, it will only update builds for the current version (safer for production servers)" "$YELLOW"
+if [ "$NON_INTERACTIVE" = "1" ]; then
+    auto_update_choice="${MINECRAFT_AUTO_UPDATE_VERSION:-n}"
+    Print_Style "Using auto-update setting from environment: $auto_update_choice" "$GREEN"
+else
+    while true; do
+        read -p "Enable auto-update to latest Minecraft version? (y/n): " auto_update_choice </dev/tty
+        case $auto_update_choice in
+            [Yy]* )
+                break
+                ;;
+            [Nn]* )
+                break
+                ;;
+            * )
+                Print_Style "Please answer yes (y) or no (n)." "$YELLOW"
+                ;;
+        esac
+    done
+fi
+
+case $auto_update_choice in
+    [Yy]* )
+        touch $DirName/minecraft/.use_latest_minecraft_version
+        Print_Style "Auto-update to latest Minecraft version enabled" "$GREEN"
+        ;;
+    [Nn]* )
+        Print_Style "Auto-update disabled. Server will stay on version $Version and only update builds." "$GREEN"
+        ;;
+esac
 
 # Run the Minecraft server for the first time which will build the modified server and exit saying the EULA needs to be accepted
 Print_Style "Building the Minecraft server..." "$YELLOW"
@@ -384,8 +557,13 @@ echo eula=true >eula.txt
 Update_Scripts
 
 # Server configuration
-Print_Style "Enter a name for your server..." "$MAGENTA"
-read -p 'Server Name: ' servername </dev/tty
+if [ "$NON_INTERACTIVE" = "1" ] && [ -n "${MINECRAFT_SERVER_NAME}" ]; then
+    servername="${MINECRAFT_SERVER_NAME}"
+    Print_Style "Using server name from environment: $servername" "$GREEN"
+else
+    Print_Style "Enter a name for your server..." "$MAGENTA"
+    read -p 'Server Name: ' servername </dev/tty
+fi
 
 # Remove non-alphanumeric characters from servername
 servername=$(echo "$servername" | tr -cd '[a-zA-Z0-9]._-')
