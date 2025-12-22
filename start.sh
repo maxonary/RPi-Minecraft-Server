@@ -187,6 +187,27 @@ echo "Starting Minecraft server.  To view window type screen -r minecraft."
 echo "To minimize the window and let the server run in the background, press Ctrl+A then Ctrl+D"
 #screen -dmS minecraft /home/pi/minecraft/jre/bin/java -DPaper.IgnoreJavaVersion=true -jar -Xms400M -Xmx6700M /home/pi/minecraft/paperclip.jar
 screen -dmS minecraft npm run start
-screen -dmS minecraftGit bash -c 'cd ../convitelist; git pull'
-screen -dmS minecraftApi bash -c 'cd ../convitelist/backend; npm install;  npm run build; npm run start'
-screen -dmS minecraftWeb bash -c 'cd ../convitelist/frontend; npm install; npm run build; sudo scp -r ./build/* /var/www/server.r-nold.eu/; sudo systemctl restart nginx'
+# Note: Convitelist services are now managed by Docker via convitelist-docker.service
+# Removed screen sessions: minecraftGit, minecraftApi, minecraftWeb
+
+echo ""
+echo "=== Useful Commands ==="
+echo "Minecraft Server:"
+echo "  screen -r minecraft          # View server console"
+echo "  systemctl status minecraft    # Check service status"
+echo "  systemctl restart minecraft   # Restart server"
+echo ""
+echo "Convitelist (Docker):"
+echo "  systemctl status convitelist-docker.service  # Check Convitelist status"
+echo "  docker ps                                    # View running containers"
+echo "  docker-compose -f /home/pi/convitelist/docker-compose.yml logs -f  # View logs"
+echo "  curl http://localhost:3002/api              # Test backend API"
+echo ""
+echo "Auto-Update:"
+echo "  systemctl status convitelist-update.timer   # Check update timer"
+echo "  systemctl start convitelist-update.service   # Manually trigger update"
+echo ""
+echo "View Logs:"
+echo "  journalctl -u minecraft.service -f          # Minecraft logs"
+echo "  journalctl -u convitelist-docker.service -f  # Convitelist logs"
+echo ""
