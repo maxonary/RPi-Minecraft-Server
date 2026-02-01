@@ -19,10 +19,10 @@ if [[ $(id -u) = 0 ]]; then
    exit 1
 fi
 
-# Check if server is running
+# Check if server is running (exit 0 if already stopped – idempotent for systemctl)
 if ! screen -list | grep -q "\.minecraft"; then
   echo "Server is not currently running!"
-  exit 1
+  exit 0
 fi
 
 # Stop the server
